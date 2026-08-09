@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PortableClaude builder — assembles a self-contained, cross-platform agent payload.
+# PortableAgents builder — assembles a self-contained, cross-platform agent payload.
 # Run on macOS or Linux. Downloads Node/Python/Git/Chrome for all targets, installs the
 # Claude + Codex CLIs, vendors flow0's .claude, and builds the web app.
 #

@@ -1,4 +1,4 @@
-# PortableClaude — run context
+# PortableAgents — run context
 
 You are running from a **portable drive** (Claude Code + Codex, with bundled Node, Python, Git and
 Chrome) on a host machine that is not yours.

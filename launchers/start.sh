@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PortableClaude launcher (Linux/macOS) — a shell with claude/codex/git/python/chrome on PATH,
+# PortableAgents launcher (Linux/macOS) — a shell with claude/codex/git/python/chrome on PATH,
 # all config + cache on the drive. Nothing is installed on the host.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,7 +33,7 @@ mkdir -p "$ROOT/temp/npm-cache" "$ROOT/temp/node-cache" "$ROOT/temp/pip-cache"
 [ -f "$ROOT/config/env.sh" ] && source "$ROOT/config/env.sh"
 
 echo " ======================================"
-echo "  PortableClaude ($T)"
+echo "  PortableAgents ($T)"
 echo "  claude | codex | git | python | node"
 echo "  chrome at: \$CHROME_BIN"
 echo "  web app:   bash start_web.sh"

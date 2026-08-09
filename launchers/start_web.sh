@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PortableClaude — launch the Claude session-viewer web app (.claude/app) with bundled Node.
+# PortableAgents — launch the Claude session-viewer web app (.claude/app) with bundled Node.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

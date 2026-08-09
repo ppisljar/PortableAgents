@@ -1,5 +1,5 @@
 @echo off
-REM PortableClaude — launch the Claude session-viewer web app with bundled Node.
+REM PortableAgents — launch the Claude session-viewer web app with bundled Node.
 setlocal
 set "ROOT=%~dp0"
 set "T=win-x64"

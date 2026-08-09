@@ -1,4 +1,4 @@
-# PortableClaude
+# PortableAgents
 
 Run **Claude Code + OpenAI Codex** — plus the full **flow0 `.claude`** (skills, agents, commands)
 and the **Claude session-viewer web app** — from a portable drive, on **Windows, Linux, and macOS
@@ -30,7 +30,7 @@ bundled for the *skills*, not the web app.
 ## Layout
 
 ```
-PortableClaude/
+PortableAgents/
   build.sh            # builder: downloads runtimes for all targets, installs agents, vendors flow0/.claude, builds the web app
   versions.env        # pinned versions (edit + rebuild to bump)
   launchers/          # copied to the drive root by build.sh

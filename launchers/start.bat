@@ -1,5 +1,5 @@
 @echo off
-REM PortableClaude launcher (Windows) — claude/codex/git/python/chrome on PATH, config on the drive.
+REM PortableAgents launcher (Windows) — claude/codex/git/python/chrome on PATH, config on the drive.
 setlocal
 set "ROOT=%~dp0"
 set "T=win-x64"
@@ -21,7 +21,7 @@ if not exist "%ROOT%temp" mkdir "%ROOT%temp"
 if exist "%ROOT%config\env.bat" call "%ROOT%config\env.bat"
 
 echo ======================================
-echo   PortableClaude (win-x64)
+echo   PortableAgents (win-x64)
 echo   claude ^| codex ^| git ^| python ^| node
 echo   chrome at: %CHROME%
 echo   web app:   start_web.bat
