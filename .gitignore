@@ -1,0 +1,8 @@
+# Downloaded runtimes + installed tools + vendored config are build artifacts, not source.
+/dist/
+/bin/
+/tools/
+/staging/
+config/.claude/
+*.log
+.DS_Store
