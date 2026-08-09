@@ -13,9 +13,13 @@ if not exist "%ROOT%temp" mkdir "%ROOT%temp"
 
 cd /d "%ROOT%config\.claude\app"
 if not exist package.json ( echo web app not found & pause & exit /b 1 )
+if exist server-dist\index.js if exist dist\index.html (
+  echo ======================================
+  echo   Claude session viewer ^(built^) - starting...
+  echo ======================================
+  node server-dist\index.js
+  goto :eof
+)
 if not exist node_modules ( echo ==^> first run: installing web app deps... & call npm install --no-audit --no-fund )
-echo ======================================
-echo   Claude session viewer - starting...
-echo   (Vite will print the local URL below)
-echo ======================================
+echo   ^(no prebuilt app - starting dev mode; Vite prints the URL^)
 call npm run dev

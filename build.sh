@@ -10,6 +10,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/versions.env"
 
 OUT="${1:?Usage: bash build.sh <dist-or-drive-path>}"
+mkdir -p "$OUT"
+OUT="$(cd "$OUT" && pwd)"   # absolutize: subshells `cd` into tool dirs, so derived paths must be absolute
 mkdir -p "$OUT"/{bin,tools,config,staging,temp,launchers}
 STAGE="$OUT/staging"
 
@@ -71,7 +73,8 @@ for T in $TARGETS; do
       linux-x64) NURL="https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz" ;;
       *) NURL="https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-$T.tar.gz" ;;
     esac
-    echo "  node: $NURL"; dl "$NURL" "$STAGE/node-$T.arc"; extract "$STAGE/node-$T.arc" "$B/node"
+    NARC="$STAGE/$(basename "$NURL")"
+    echo "  node: $NURL"; dl "$NURL" "$NARC"; extract "$NARC" "$B/node"
   else echo "  node: present"; fi
 
   # Python — python-build-standalone (install_only, relocatable)
@@ -106,10 +109,13 @@ for T in $TARGETS; do
   say "[$T] agents (claude + codex)"
   for pair in "claude-code:$CLAUDE_PKG" "codex:$CODEX_PKG"; do
     name="${pair%%:*}"; pkg="${pair#*:}"; d="$OUT/tools/$T/$name"
-    if [ ! -d "$d/node_modules" ]; then
-      mkdir -p "$d"; ( cd "$d" && "$HOST_NPM" init -y --silent >/dev/null 2>&1 \
-        && "$HOST_NPM" install --os="$(npm_os "$T")" --cpu="$(npm_cpu "$T")" --no-audit --no-fund "$pkg" )
-    else echo "  $name: present"; fi
+    if [ -d "$d/node_modules" ]; then echo "  $name: present"; continue; fi
+    echo "  installing $name ($pkg) for $T ..."; mkdir -p "$d"
+    ( cd "$d"
+      "$HOST_NPM" init -y >/dev/null
+      "$HOST_NPM" install --os="$(npm_os "$T")" --cpu="$(npm_cpu "$T")" --no-audit --no-fund "$pkg" \
+        || { echo "  retry $name/$T ..."; "$HOST_NPM" install --os="$(npm_os "$T")" --cpu="$(npm_cpu "$T")" --no-audit --no-fund "$pkg"; }
+    ) || { echo "  ERROR: failed to install $name for $T"; exit 1; }
   done
 done
 
@@ -119,27 +125,54 @@ say "vendor $FLOW0_DIR/.claude -> config/.claude"
 rsync -a --delete \
   --exclude '.secrets/' --exclude 'node_modules/' --exclude 'venv/' --exclude '.venv/' \
   --exclude '__pycache__/' --exclude '*.pyc' --exclude 'todos/' --exclude '.browser_data/' \
-  --exclude 'app/dist/' --exclude 'tmp/' --exclude '.DS_Store' \
+  --exclude 'app/dist/' --exclude 'app/server-dist/' --exclude 'tmp/' --exclude '.DS_Store' \
   "$FLOW0_DIR/.claude/" "$OUT/config/.claude/"
 # secret-provider template so the layout is discoverable (real secrets provided on the drive)
 mkdir -p "$OUT/config/.claude/.secrets"
 [ -f "$OUT/config/.claude/.secrets/service-provider.json" ] || \
   echo '{ "network": { "unifi": {}, "fritzbox": {} } }' > "$OUT/config/.claude/.secrets/service-provider.json.example"
 
-# ── host-platform: python deps + web app build (other platforms self-heal on first run) ──
-say "[$HOST_T] python deps for the skills"
+# ── python deps for the skills — installed for ALL targets (offline wheels) ──
+say "python deps for the skills (all platforms, offline wheels)"
 HOST_PY="$OUT/bin/$HOST_T/python/bin/python3"
+PYMM="$(echo "$PYTHON_VERSION" | cut -d. -f1-2)"
+pip_platform(){ case "$1" in
+  linux-x64)    echo manylinux2014_x86_64 ;;
+  win-x64)      echo win_amd64 ;;
+  darwin-x64)   echo macosx_11_0_x86_64 ;;   # 11_0 matches 10.9..11 wheels; 10_12 excluded newer-only ones
+  darwin-arm64) echo macosx_11_0_arm64 ;; esac; }
+py_site(){ case "$1" in
+  win-x64) echo "$OUT/bin/$1/python/Lib/site-packages" ;;
+  *)       echo "$OUT/bin/$1/python/lib/python$PYMM/site-packages" ;; esac; }
+pip_target(){ "$HOST_PY" -m pip install --disable-pip-version-check --no-input -q \
+  --target "$1" --platform "$2" --python-version "$PYMM" --only-binary=:all: "${@:3}"; }
 if [ -f "$FLOW0_DIR/requirements.txt" ] && [ -x "$HOST_PY" ]; then
   "$HOST_PY" -m pip install --upgrade pip --quiet || true
-  "$HOST_PY" -m pip install -r "$FLOW0_DIR/requirements.txt" --quiet || \
-    echo "  (some deps failed; skills that need them will self-install on first run)"
+  for T in $TARGETS; do
+    SITE="$(py_site "$T")"; PLAT="$(pip_platform "$T")"; mkdir -p "$SITE"
+    echo "  [$T] pip wheels ($PLAT) -> site-packages"
+    if ! pip_target "$SITE" "$PLAT" -r "$FLOW0_DIR/requirements.txt" 2>/dev/null; then
+      echo "  [$T] bulk install failed (bad pin / missing wheel) — installing per-package…"
+      grep -vE '^[[:space:]]*#|^[[:space:]]*$' "$FLOW0_DIR/requirements.txt" | while IFS= read -r req; do
+        pip_target "$SITE" "$PLAT" "$req" 2>/dev/null || echo "    skip: $req"
+      done
+    fi
+  done
 fi
 
-say "[$HOST_T] build the web app (.claude/app)"
+# ── web app — build client + compile server + prune to prod deps (Node-only, all platforms) ──
+say "web app: build client + compile server + prune to prod deps"
 APP="$OUT/config/.claude/app"
-if [ -f "$APP/package.json" ]; then
-  ( cd "$APP" && "$HOST_NPM" install --no-audit --no-fund && "$HOST_NPM" run build ) \
-    || echo "  (web app build deferred — start_web will install/build on first run)"
+if [ -f "$APP/server-dist/index.js" ] && [ -f "$APP/dist/index.html" ]; then
+  echo "  web app: already built"
+elif [ -f "$APP/package.json" ]; then
+  ( cd "$APP"
+    "$HOST_NPM" install --no-audit --no-fund
+    "$HOST_NPM" exec -- vite build                                    # client -> dist/ (static)
+    # compile server to server-dist/ (sibling of dist/) so its `../dist` points at the client build
+    "$HOST_NPM" exec -- tsc -p tsconfig.server.json --outDir server-dist || true
+    "$HOST_NPM" prune --omit=dev                                      # drop dev deps -> node_modules pure-JS
+  ) || echo "  (web app build issue — start_web will finish on first run)"
 fi
 
 # ── launchers + config ───────────────────────────────────────────────────────

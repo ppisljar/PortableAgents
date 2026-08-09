@@ -18,12 +18,17 @@ mkdir -p "$ROOT/temp/npm-cache"
 APP="$ROOT/config/.claude/app"
 [ -f "$APP/package.json" ] || { echo "web app not found at $APP"; exit 1; }
 cd "$APP"
-if [ ! -d node_modules ]; then
-  echo "==> first run: installing web app deps (bundled npm)…"
-  npm install --no-audit --no-fund
+
+# Preferred: the prebuilt, pruned production app — pure Node, works offline on every platform.
+if [ -f server-dist/index.js ] && [ -f dist/index.html ]; then
+  echo " ======================================"
+  echo "  Claude session viewer (built) — starting…"
+  echo "  (the server prints its URL below)"
+  echo " ======================================"
+  exec node server-dist/index.js
 fi
-echo " ======================================"
-echo "  Claude session viewer — starting…"
-echo "  (Vite will print the local URL below)"
-echo " ======================================"
+
+# Fallback (unbuilt / first run without a prior build): dev mode.
+[ -d node_modules ] || { echo "==> first run: installing web app deps…"; npm install --no-audit --no-fund; }
+echo "  (no prebuilt app found — starting dev mode; Vite prints the URL below)"
 exec npm run dev

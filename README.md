@@ -45,16 +45,22 @@ PortableClaude/
 The **repo** holds scripts + config; the heavy binaries are downloaded into `dist/` at build time
 (or straight onto your USB), so they're never committed.
 
-## Build
+## Build & deploy
+
+Build to a normal filesystem first (the build needs symlinks), then deploy onto your drive:
 
 ```bash
 # on macOS or Linux, with flow0 at ~/_code/_flow0 (or set FLOW0_DIR)
-bash build.sh /Volumes/MY_USB          # build directly onto a drive
-bash build.sh ./dist                   # or stage locally first
+bash build.sh ./dist                        # download + assemble everything (~6 GB, offline-ready)
+
+# then put it on a drive:
+bash deploy.sh ./dist /Volumes/USB --exfat  # exFAT USB: flatten symlinks/hardlinks (portable, larger)
+bash deploy.sh ./dist /mnt/ext              # APFS/ext4/NTFS: keep links (compact)
 ```
-Downloads Node/Python/Git/Chrome for all four targets, installs Claude+Codex, `pip install`s the
-skills' requirements into the portable Python, vendors `flow0/.claude` (excluding secrets), and
-builds the web app. Re-running is incremental (skips what's already present).
+`build.sh` downloads Node/Python/Git/Chrome for all four targets, cross-installs Claude+Codex,
+installs the skills' Python deps as **per-platform wheels** (offline on every OS), vendors
+`flow0/.claude` (excluding secrets), and builds the web app (static client + a compiled Node server).
+Re-running is incremental (skips what's already built).
 
 ## Run
 
@@ -72,6 +78,16 @@ drive via the secret provider (`config/.claude/.secrets/service-provider.json`) 
 committed.
 
 ## Status
-v1 scaffold. The launchers + layout are complete; a full `build.sh` run (which downloads the
-runtimes for all four platforms) is the validation step — see inline notes in `build.sh` for the
-per-platform asset resolution.
+**Built and validated on macOS** (full `build.sh` run, payload ≈ 6 GB). Confirmed working:
+- Node/Python/Git/Chrome downloaded for all 4 targets; Claude Code + Codex installed for all 4.
+- Bundled CLIs run on the host: Claude Code 2.1.226, Codex 0.147.0, git 2.47.1 (dugite), node
+  v22.14.0, python 3.12.9.
+- Python skill deps installed as per-platform wheels on all 4 targets.
+- Web app builds and serves (`/` → 200, `/api/health` → 200) from the compiled Node server.
+- 22 skills vendored; `.secrets` excluded.
+
+Notes:
+- Running the CLIs on the *other* three platforms is only fully verifiable on those OSes, but the
+  payloads are assembled cross-platform the same proven way as the reference project.
+- flow0's `requirements.txt` pins `pyyaml==6.0.3`, which doesn't exist on PyPI — the build skips it
+  gracefully (pyyaml still lands transitively). Worth fixing the pin in flow0.
