@@ -31,51 +31,182 @@ bundled for the *skills*, not the web app.
 
 ```
 PortableAgents/
-  build.sh            # builder: downloads runtimes for all targets, installs agents, vendors flow0/.claude, builds the web app
-  versions.env        # pinned versions (edit + rebuild to bump)
-  launchers/          # copied to the drive root by build.sh
-    start.sh/.bat       # agent shell — `claude` / `codex` on PATH, config on the drive
-    start_web.sh/.bat   # launch the session-viewer web app
+  build.sh              # builder: downloads runtimes for all targets, installs agents, vendors flow0/.claude, builds the web app
+  deploy.sh             # deploys built payload onto a drive (exFAT or native filesystem)
+  versions.env          # pinned versions (edit + rebuild to bump)
+  launchers/            # copied to the drive root by build.sh
+    start.sh/.bat         # interactive shell — claude/codex/git/python/node/chrome on PATH
+    start_web.sh/.bat     # launch the session-viewer web app
+    claude.sh/.bat        # start Claude Code directly (Anthropic API)
+    codex.sh/.bat         # start Codex directly (OpenAI API)
+    claude-deepseek.sh/.bat  # start Claude Code via DeepSeek's Anthropic-compatible endpoint
+    codex-deepseek.sh/.bat   # start Codex via DeepSeek's OpenAI-compatible endpoint
   config/
-    .claude/          # vendored from flow0 (skills, app, agents, commands) — built, gitignored
-    CLAUDE.md         # portable-run guidance for the agent
-  dist/ bin/ tools/   # build outputs (gitignored): the actual portable payload
+    projects_list.json   # project template with __ROOT__ placeholder (launchers patch it at runtime)
+    project_config.yaml  # project config template with __ROOT__ placeholder
+    env.sh / env.bat     # API key placeholders for Anthropic + OpenAI (edit with your keys)
+    deepseek_env.sh/.bat # DeepSeek API key + endpoint config (edit with your key)
+    CLAUDE.md            # portable-run guidance for the agent
+  dist/ bin/ tools/     # build outputs (gitignored): the actual portable payload
 ```
 
-The **repo** holds scripts + config; the heavy binaries are downloaded into `dist/` at build time
-(or straight onto your USB), so they're never committed.
+The **repo** holds scripts + config templates; the heavy binaries are downloaded into `dist/` at build
+time (or straight onto your USB), so they're never committed. `config/.claude/` is vendored from
+flow0 at build time and also gitignored.
 
-## Build & deploy
+## How to build
+
+### Prerequisites
+- macOS or Linux (the build host)
+- `curl`, `tar`, `unzip`, `python3`, `rsync`
+- `flow0` at `~/_code/_flow0` (or set `FLOW0_DIR` env var)
+- ~6 GB free disk space (all 4 platforms)
+
+### Build & deploy
 
 Build to a normal filesystem first (the build needs symlinks), then deploy onto your drive:
 
 ```bash
-# on macOS or Linux, with flow0 at ~/_code/_flow0 (or set FLOW0_DIR)
-bash build.sh ./dist                        # download + assemble everything (~6 GB, offline-ready)
+# 1. Build the payload (~6 GB, downloads all runtimes + installs agents)
+bash build.sh ./dist
 
-# then put it on a drive:
-bash deploy.sh ./dist /Volumes/USB --exfat  # exFAT USB: flatten symlinks/hardlinks (portable, larger)
+# 2. Deploy to drive
+bash deploy.sh ./dist /Volumes/USB --exfat  # exFAT USB: flatten symlinks (portable, larger)
 bash deploy.sh ./dist /mnt/ext              # APFS/ext4/NTFS: keep links (compact)
 ```
+
 `build.sh` downloads Node/Python/Git/Chrome for all four targets, cross-installs Claude+Codex,
 installs the skills' Python deps as **per-platform wheels** (offline on every OS), vendors
 `flow0/.claude` (excluding secrets), and builds the web app (static client + a compiled Node server).
 Re-running is incremental (skips what's already built).
 
-## Run
+### What the build copies
 
-- **Agent shell** — `bash start.sh` (Linux/macOS) or double-click `start.bat` (Windows) → a shell
-  with `claude`, `codex`, `git`, `python`, and `chrome` all on PATH, config + cache on the drive.
-- **Web app** — `bash start_web.sh` (or `start_web.bat`) → serves the session viewer (opens the
-  browser at the printed URL).
+| Source | Destination on drive | Notes |
+|--------|---------------------|-------|
+| `launchers/*` | drive root | All .sh/.bat launchers |
+| `config/projects_list.json` | `config/.claude/` | With `__ROOT__` placeholder → patched at runtime |
+| `config/project_config.yaml` | `config/.claude/` | With `__ROOT__` placeholder → patched at runtime |
+| `config/CLAUDE.md` | `config/` | Agent run-context instructions |
+| Flow0 `.claude/` | `config/.claude/` | Skills, agents, app, commands (secrets excluded) |
+| Generated `env.sh/.bat` | `config/` | API key placeholders (only if not already present) |
+| `config/deepseek_env.sh/.bat` | `config/` | DeepSeek config (only if not already present) |
 
-Auth: OAuth (log in via browser on first `claude`/`codex` use — token stored on the drive) or API
-keys in `config/env.sh` / `config/env.bat`.
+## How to set secrets
 
-## Secrets
-`flow0/.claude/.secrets` is **not** vendored (it's excluded from the copy). Provide credentials on the
-drive via the secret provider (`config/.claude/.secrets/service-provider.json`) or env files — never
-committed.
+The drive ships with **placeholder keys only** — you must add your own. There are three ways:
+
+### 1. API key env files (simplest)
+
+Edit these files on the drive after build:
+
+**`config/env.sh`** / **`config/env.bat`** — for default Anthropic + OpenAI:
+```bash
+# config/env.sh — edit with your real keys:
+export ANTHROPIC_API_KEY="sk-ant-api03-your-real-key"
+export OPENAI_API_KEY="sk-your-real-openai-key"
+```
+
+**`config/deepseek_env.sh`** / **`config/deepseek_env.bat`** — for DeepSeek:
+```bash
+# config/deepseek_env.sh — edit with your real key:
+# Either set DEEPSEEK_API_KEY before running, or replace the placeholder below:
+export ANTHROPIC_AUTH_TOKEN="${DEEPSEEK_API_KEY:-sk-YOUR_KEY_HERE}"  # ← replace
+```
+
+On Windows, the `.bat` equivalents use `set "KEY=value"` syntax.
+
+### 2. Environment variable (no file edit)
+
+Set `DEEPSEEK_API_KEY` before launching, e.g.:
+```bash
+DEEPSEEK_API_KEY="sk-your-key" bash claude-deepseek.sh -p "hello"
+```
+The deepseek env files check this variable first, so the file's placeholder is ignored.
+
+### 3. OAuth login (Claude only, no key needed)
+
+If no API key is set in `config/env.sh`, Claude Code will prompt a browser-based OAuth login on
+first use. The token is stored on the drive (in `config/.claude/`) and reused across sessions.
+
+### 4. Service provider secrets (for skills)
+
+The skills (UniFi, FRITZ!Box, Eclipso email, etc.) read credentials from
+`config/.claude/.secrets/service-provider.json`. This file is **never committed** and excluded from
+the build. Create it on your drive manually:
+
+```json
+{
+  "network": {
+    "unifi": { "url": "https://192.168.1.1", "username": "admin", "password": "..." },
+    "fritzbox": { "url": "http://192.168.178.1", "password": "..." }
+  },
+  "email": {
+    "eclipso": { "email": "you@eclipso.eu", "password": "...", "imap": "...", "smtp": "..." }
+  }
+}
+```
+
+A minimal template is at `config/.claude/.secrets/service-provider.json.example` on the drive.
+
+### Security notes
+
+- **Never commit real keys.** The repo templates all use `YOUR_KEY_HERE` placeholders.
+- The drive's `.gitignore` excludes `config/.claude/` (which contains the OAuth token and secrets).
+- `build.sh` explicitly excludes `.secrets/` when vendoring flow0's `.claude`.
+- On a shared machine, treat the drive like a password manager — anyone with physical access can read the files.
+
+## How to use
+
+### Quick reference
+
+| Launcher | API backend | Auth | When to use |
+|----------|------------|------|-------------|
+| `start.sh` / `start.bat` | Interactive shell | OAuth or env keys | General dev work, exploring |
+| `start_web.sh` / `start_web.bat` | N/A | N/A | View conversations, diagrams |
+| `claude.sh` / `claude.bat` | Anthropic | OAuth or env key | Direct Claude Code sessions |
+| `codex.sh` / `codex.bat` | OpenAI | Env key | Direct Codex sessions |
+| `claude-deepseek.sh` / `.bat` | DeepSeek (Anthropic-compatible) | DeepSeek key | Claude via DeepSeek |
+| `codex-deepseek.sh` / `.bat` | DeepSeek (OpenAI-compatible) | DeepSeek key | Codex via DeepSeek |
+
+### Agent shell
+```bash
+bash start.sh                          # macOS/Linux: interactive shell
+# Inside the shell: claude, codex, git, python, node, chrome all on PATH
+
+# Or pass a prompt directly:
+bash claude.sh -p "explain this code"
+bash codex.sh "refactor this function"
+bash claude-deepseek.sh -p "review this PR"
+```
+
+On Windows, double-click `start.bat` or run `claude.bat`, `codex.bat`, etc. from Command Prompt.
+
+### Web app
+```bash
+bash start_web.sh                      # macOS/Linux
+# → http://localhost:3001 (or the URL printed in the terminal)
+```
+On Windows, double-click `start_web.bat`.
+
+### Switching API providers on the fly
+
+The `claude.sh` and `codex.sh` launchers use whatever API keys are in `config/env.sh`.
+To temporarily use DeepSeek, use the `*-deepseek.sh` launchers instead — they source
+`config/deepseek_env.sh` which points at DeepSeek's endpoints.
+
+You can also override the env file path:
+```bash
+CLAUDE_ENV="$PWD/config/deepseek_env.sh" bash claude.sh -p "hello"   # Claude via DeepSeek
+CODEX_ENV="$PWD/config/custom.sh" bash codex.sh "explain"            # Codex via custom endpoint
+```
+
+### How project paths stay portable
+
+The drive can be mounted anywhere — `/Volumes/KINGSTON` on macOS, `/media/usb` on Linux, `E:\`
+on Windows. All launchers detect the mount point at startup and patch `projects_list.json`
+and `project_config.yaml` by replacing the `__ROOT__` placeholder with the actual path. No
+manual config editing needed when moving between machines.
 
 ## Status
 **Built and validated on macOS** (full `build.sh` run, payload ≈ 6 GB). Confirmed working:
