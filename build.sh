@@ -132,6 +132,15 @@ mkdir -p "$OUT/config/.claude/.secrets"
 [ -f "$OUT/config/.claude/.secrets/service-provider.json" ] || \
   echo '{ "network": { "unifi": {}, "fritzbox": {} } }' > "$OUT/config/.claude/.secrets/service-provider.json.example"
 
+# Replace host-specific project paths with the portable __ROOT__ placeholder
+# (launcher scripts replace __ROOT__ with the actual mount point at runtime)
+if [ -f "$HERE/config/projects_list.json" ]; then
+  cp "$HERE/config/projects_list.json" "$OUT/config/.claude/projects_list.json"
+fi
+if [ -f "$HERE/config/project_config.yaml" ]; then
+  cp "$HERE/config/project_config.yaml" "$OUT/config/.claude/project_config.yaml"
+fi
+
 # ── python deps for the skills — installed for ALL targets (offline wheels) ──
 say "python deps for the skills (all platforms, offline wheels)"
 HOST_PY="$OUT/bin/$HOST_T/python/bin/python3"
@@ -178,7 +187,7 @@ fi
 # ── launchers + config ───────────────────────────────────────────────────────
 say "launchers + config"
 cp "$HERE/launchers/"* "$OUT/" 2>/dev/null || true
-chmod +x "$OUT"/start.sh "$OUT"/start_web.sh 2>/dev/null || true
+chmod +x "$OUT"/*.sh 2>/dev/null || true
 [ -f "$OUT/config/CLAUDE.md" ] || cp "$HERE/config/CLAUDE.md" "$OUT/config/CLAUDE.md" 2>/dev/null || true
 [ -f "$OUT/config/env.sh" ] || cat > "$OUT/config/env.sh" <<'E'
 # Optional API keys (leave as-is to use OAuth login instead).
@@ -189,6 +198,11 @@ E
 set "ANTHROPIC_API_KEY=YOUR_KEY_HERE"
 set "OPENAI_API_KEY=YOUR_KEY_HERE"
 E
+
+# DeepSeek env templates (API key placeholder — set DEEPSEEK_API_KEY to override)
+[ -f "$OUT/config/deepseek_env.sh" ] || cp "$HERE/config/deepseek_env.sh" "$OUT/config/deepseek_env.sh" 2>/dev/null || true
+[ -f "$OUT/config/deepseek_env.bat" ] || cp "$HERE/config/deepseek_env.bat" "$OUT/config/deepseek_env.bat" 2>/dev/null || true
+
 
 rm -rf "$STAGE"
 say "Done. Payload at: $OUT"

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# PortableAgents launcher (Linux/macOS) — a shell with claude/codex/git/python/chrome on PATH,
-# all config + cache on the drive. Nothing is installed on the host.
+# PortableAgents + DeepSeek — Claude Code backed by DeepSeek's Anthropic-compatible API.
+# Any arguments pass straight through to `claude`, e.g.:  ./claude-deepseek.sh -p "hello"
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# --- platform detection (same as start.sh) ----------------------------------
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)              T=linux-x64 ;;
   Darwin-x86_64)             T=darwin-x64 ;;
@@ -13,7 +14,7 @@ esac
 B="$ROOT/bin/$T"
 [ -x "$B/node/bin/node" ] || { echo "No bundled Node for $T — run build.sh."; exit 1; }
 
-# bundled Chrome binary (Chrome for Testing layout differs by OS)
+# --- PATH + bundled runtimes ------------------------------------------------
 case "$T" in
   linux-x64)  CHROME="$B/chrome/chrome" ;;
   darwin-*)   CHROME="$B/chrome/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing" ;;
@@ -24,26 +25,27 @@ export PATH="$B/node/bin:$B/git/bin:$B/python/bin:$ROOT/tools/$T/claude-code/nod
 [ -d "$B/git/share/git-core/templates" ] && export GIT_TEMPLATE_DIR="$B/git/share/git-core/templates"
 export CHROME_BIN="$CHROME" PUPPETEER_EXECUTABLE_PATH="$CHROME" CHROME_PATH="$CHROME"
 
-# config + cache stay on the drive
+# --- config + cache stay on the drive ---------------------------------------
 export CLAUDE_CONFIG_DIR="$ROOT/config/.claude"
 export XDG_CONFIG_HOME="$ROOT/config"
 export TMPDIR="$ROOT/temp"; export NPM_CONFIG_CACHE="$ROOT/temp/npm-cache"
 export NODE_COMPILE_CACHE="$ROOT/temp/node-cache"; export PIP_CACHE_DIR="$ROOT/temp/pip-cache"
 mkdir -p "$ROOT/temp/npm-cache" "$ROOT/temp/node-cache" "$ROOT/temp/pip-cache"
-[ -f "$ROOT/config/env.sh" ] && source "$ROOT/config/env.sh"
+
+# --- DeepSeek env (overrides ANTHROPIC_*) -----------------------------------
+DEEPSEEK_ENV="${DEEPSEEK_ENV:-$ROOT/config/deepseek_env.sh}"
+if [ -f "$DEEPSEEK_ENV" ]; then
+  # shellcheck disable=SC1090
+  source "$DEEPSEEK_ENV"
+else
+  echo "claude-deepseek: missing $DEEPSEEK_ENV (set DEEPSEEK_ENV=... or create config/deepseek_env.sh)" >&2
+  exit 1
+fi
 
 # --- patch project paths for this mount point (portable across OS/mounts) -------
 for f in "$ROOT/config/.claude/projects_list.json" "$ROOT/config/.claude/project_config.yaml"; do
   [ -f "$f" ] && sed "s|__ROOT__|$ROOT|g" "$f" > "$f.tmp" && mv "$f.tmp" "$f"
 done
 
-echo " ======================================"
-echo "  PortableAgents ($T)"
-echo "  claude | codex | git | python | node"
-echo "  chrome at: \$CHROME_BIN"
-echo "  web app:   bash start_web.sh"
-echo " ======================================"
-[ "${ANTHROPIC_API_KEY:-YOUR_KEY_HERE}" = "YOUR_KEY_HERE" ] && \
-  echo "  (no API key set — 'claude' will prompt OAuth login)"
-cd "${HOME:-$ROOT}"
-exec bash --norc --noprofile
+cd "$ROOT"
+exec claude --dangerously-skip-permissions "$@"

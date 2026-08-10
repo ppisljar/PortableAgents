@@ -11,6 +11,10 @@ set "TEMP=%ROOT%temp"
 set "NPM_CONFIG_CACHE=%ROOT%temp\npm-cache"
 if not exist "%ROOT%temp" mkdir "%ROOT%temp"
 
+REM --- patch project paths for this mount point (portable across OS/mounts) -------
+set "ROOT_NT=%ROOT:~0,-1%"
+powershell -NoProfile -Command "$r='%ROOT_NT%'; @('projects_list.json','project_config.yaml')|%%{$f=\"$r\config\.claude\$_\" ; if(Test-Path $f){(Get-Content $f -Raw)-replace '__ROOT__',$r|Set-Content $f -NoNewline}}"
+
 cd /d "%ROOT%config\.claude\app"
 if not exist package.json ( echo web app not found & pause & exit /b 1 )
 if exist server-dist\index.js if exist dist\index.html (

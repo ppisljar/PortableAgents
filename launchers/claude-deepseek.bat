@@ -1,16 +1,20 @@
 @echo off
-REM PortableAgents launcher (Windows) — claude/codex/git/python/chrome on PATH, config on the drive.
+REM PortableAgents + DeepSeek — Claude Code backed by DeepSeek's Anthropic-compatible API.
+REM Any arguments pass through to claude, e.g.:  claude-deepseek.bat -p "hello"
 setlocal
 set "ROOT=%~dp0"
 set "T=win-x64"
 set "B=%ROOT%bin\%T%"
 if not exist "%B%\node\node.exe" ( echo No bundled Node for %T% - run build.sh first. & pause & exit /b 1 )
 
+REM --- PATH + bundled runtimes ------------------------------------------------
 set "CHROME=%B%\chrome\chrome.exe"
 set "PATH=%B%\node;%B%\git\cmd;%B%\git\mingw64\bin;%B%\python;%ROOT%tools\%T%\claude-code\node_modules\.bin;%ROOT%tools\%T%\codex\node_modules\.bin;%PATH%"
 set "CHROME_BIN=%CHROME%"
 set "PUPPETEER_EXECUTABLE_PATH=%CHROME%"
 set "CHROME_PATH=%CHROME%"
+
+REM --- config + cache stay on the drive ---------------------------------------
 set "CLAUDE_CONFIG_DIR=%ROOT%config\.claude"
 set "XDG_CONFIG_HOME=%ROOT%config"
 set "TMP=%ROOT%temp"
@@ -23,13 +27,12 @@ REM --- patch project paths for this mount point (portable across OS/mounts) ---
 set "ROOT_NT=%ROOT:~0,-1%"
 powershell -NoProfile -Command "$r='%ROOT_NT%'; @('projects_list.json','project_config.yaml')|%%{$f=\"$r\config\.claude\$_\" ; if(Test-Path $f){(Get-Content $f -Raw)-replace '__ROOT__',$r|Set-Content $f -NoNewline}}"
 
-if exist "%ROOT%config\env.bat" call "%ROOT%config\env.bat"
+REM --- DeepSeek env (overrides ANTHROPIC_*) -----------------------------------
+if not defined DEEPSEEK_ENV set "DEEPSEEK_ENV=%ROOT%config\deepseek_env.bat"
+if not exist "%DEEPSEEK_ENV%" ( echo claude-deepseek: missing %DEEPSEEK_ENV% & pause & exit /b 1 )
+call "%DEEPSEEK_ENV%"
 
-echo ======================================
-echo   PortableAgents (win-x64)
-echo   claude ^| codex ^| git ^| python ^| node
-echo   chrome at: %CHROME%
-echo   web app:   start_web.bat
-echo ======================================
-if "%ANTHROPIC_API_KEY%"=="YOUR_KEY_HERE" echo   (no API key set - 'claude' will prompt OAuth login)
-cmd /k
+echo  PortableAgents + DeepSeek (win-x64)
+echo  model: %ANTHROPIC_MODEL%
+cd /d "%USERPROFILE%"
+claude %*

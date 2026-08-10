@@ -1,0 +1,14 @@
+# Project Configuration
+# String replacements for read_file.py script
+
+project_name: _flow0
+project_path: __ROOT__
+
+# String replacements that will be applied when reading files
+# These are useful for templates and documentation that reference project-specific values
+replacements:
+  "<PROJECT_NAME>": "_flow0"
+  "<PROJECT_PATH>": "__ROOT__"
+  "<BACKEND_PORT>": "3000"
+  "<FRONTEND_PORT>": "3001"
+  "<API_URL>": "http://localhost:3000/api"

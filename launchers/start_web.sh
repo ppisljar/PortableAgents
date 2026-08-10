@@ -15,6 +15,11 @@ export PATH="$B/node/bin:$B/git/bin:$B/python/bin:$PATH"
 export TMPDIR="$ROOT/temp"; export NPM_CONFIG_CACHE="$ROOT/temp/npm-cache"
 mkdir -p "$ROOT/temp/npm-cache"
 
+# --- patch project paths for this mount point (portable across OS/mounts) -------
+for f in "$ROOT/config/.claude/projects_list.json" "$ROOT/config/.claude/project_config.yaml"; do
+  [ -f "$f" ] && sed "s|__ROOT__|$ROOT|g" "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+done
+
 APP="$ROOT/config/.claude/app"
 [ -f "$APP/package.json" ] || { echo "web app not found at $APP"; exit 1; }
 cd "$APP"
