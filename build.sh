@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PortableAgents builder — assembles a self-contained, cross-platform agent payload.
 # Run on macOS or Linux. Downloads Node/Python/Git/Chrome for all targets, installs the
-# Claude + Codex CLIs, vendors flow0's .claude, and builds the web app.
+# Claude + Codex CLIs, optionally vendors flow0's .claude (set FLOW0_DIR), and builds the web app.
 #
 #   bash build.sh <dist-or-drive-path>          e.g.  bash build.sh ./dist   |   /Volumes/USB
 set -euo pipefail
@@ -161,14 +161,24 @@ EOF
   esac
 done
 
-# ── vendor flow0 .claude (skills, app, agents, commands) — no secrets/junk ───
-say "vendor $FLOW0_DIR/.claude -> config/.claude"
-[ -d "$FLOW0_DIR/.claude" ] || { echo "FLOW0_DIR/.claude not found: $FLOW0_DIR"; exit 1; }
-rsync -a --delete \
-  --exclude '.secrets/' --exclude 'node_modules/' --exclude 'venv/' --exclude '.venv/' \
-  --exclude '__pycache__/' --exclude '*.pyc' --exclude 'todos/' --exclude '.browser_data/' \
-  --exclude 'app/dist/' --exclude 'app/server-dist/' --exclude 'tmp/' --exclude '.DS_Store' \
-  "$FLOW0_DIR/.claude/" "$OUT/config/.claude/"
+# ── vendor flow0 .claude (skills, app, agents, commands) — OPTIONAL ──────────
+# Set FLOW0_DIR=/path/to/flow0 to bundle the flow app + skills. If it is unset or
+# missing, the build still succeeds and produces a lean drive with just the CLIs
+# + runtimes (no flow app / skills).
+FLOW0_DIR="${FLOW0_DIR:-}"
+mkdir -p "$OUT/config/.claude"
+if [ -n "$FLOW0_DIR" ] && [ -d "$FLOW0_DIR/.claude" ]; then
+  say "vendor $FLOW0_DIR/.claude -> config/.claude"
+  rsync -a --delete \
+    --exclude '.secrets/' --exclude 'node_modules/' --exclude 'venv/' --exclude '.venv/' \
+    --exclude '__pycache__/' --exclude '*.pyc' --exclude 'todos/' --exclude '.browser_data/' \
+    --exclude 'app/dist/' --exclude 'app/server-dist/' --exclude 'tmp/' --exclude '.DS_Store' \
+    "$FLOW0_DIR/.claude/" "$OUT/config/.claude/"
+elif [ -n "$FLOW0_DIR" ]; then
+  echo "  WARNING: FLOW0_DIR=$FLOW0_DIR set but $FLOW0_DIR/.claude not found — skipping flow app + skills"
+else
+  say "no FLOW0_DIR — building without flow app + skills (CLIs + runtimes only)"
+fi
 # secret-provider template so the layout is discoverable (real secrets provided on the drive)
 mkdir -p "$OUT/config/.claude/.secrets"
 # self-guarding .gitignore: never commit anything in the secrets folder (except this rule)
@@ -200,7 +210,7 @@ py_site(){ case "$1" in
   *)       echo "$OUT/bin/$1/python/lib/python$PYMM/site-packages" ;; esac; }
 pip_target(){ "$HOST_PY" -m pip install --disable-pip-version-check --no-input -q \
   --target "$1" --platform "$2" --python-version "$PYMM" --only-binary=:all: "${@:3}"; }
-if [ -f "$FLOW0_DIR/requirements.txt" ] && [ -x "$HOST_PY" ]; then
+if [ -n "$FLOW0_DIR" ] && [ -f "$FLOW0_DIR/requirements.txt" ] && [ -x "$HOST_PY" ]; then
   "$HOST_PY" -m pip install --upgrade pip --quiet || true
   for T in $TARGETS; do
     SITE="$(py_site "$T")"; PLAT="$(pip_platform "$T")"; mkdir -p "$SITE"
@@ -214,12 +224,12 @@ if [ -f "$FLOW0_DIR/requirements.txt" ] && [ -x "$HOST_PY" ]; then
   done
 fi
 
-# ── web app — build client + compile server + prune to prod deps (Node-only, all platforms) ──
-say "web app: build client + compile server + prune to prod deps"
+# ── web app — build client + compile server + prune to prod deps (only if flow app present) ──
 APP="$OUT/config/.claude/app"
 if [ -f "$APP/server-dist/index.js" ] && [ -f "$APP/dist/index.html" ]; then
-  echo "  web app: already built"
+  say "web app: already built"
 elif [ -f "$APP/package.json" ]; then
+  say "web app: build client + compile server + prune to prod deps"
   ( cd "$APP"
     "$HOST_NPM" install --no-audit --no-fund
     "$HOST_NPM" exec -- vite build                                    # client -> dist/ (static)
