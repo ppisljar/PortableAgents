@@ -1,9 +1,12 @@
 # PortableAgents
 
-Run **Claude Code + OpenAI Codex** — plus the full **flow0 `.claude`** (skills, agents, commands)
-and the **Claude session-viewer web app** — from a portable drive, on **Windows, Linux, and macOS
+Run **Claude Code + OpenAI Codex** from a portable drive, on **Windows, Linux, and macOS
 (Intel + Apple Silicon)**. No install on the host; everything (runtimes, config, cache) lives on the
 drive.
+
+**Two build modes:**
+- **Lean (default):** just the CLIs + portable runtimes (Node/Git/Python/Chrome). Nothing extra needed — clone and build.
+- **Full (opt-in):** set `FLOW0_DIR=/path/to/flow0` to also bundle the **flow0 `.claude`** (skills, agents, commands) and the **Claude session-viewer web app**.
 
 Inspired by [portable-agent-usb](https://github.com/bnovik0v/portable-agent-usb), extended with:
 macOS support, **portable Git**, **portable Python**, **standalone Chrome**, the flow0 skill set,
@@ -31,7 +34,7 @@ bundled for the *skills*, not the web app.
 
 ```
 PortableAgents/
-  build.sh              # builder: downloads runtimes for all targets, installs agents, vendors flow0/.claude, builds the web app
+  build.sh              # builder: downloads runtimes for all targets, installs agents; optionally vendors flow0/.claude + builds the web app (FLOW0_DIR)
   deploy.sh             # deploys built payload onto a drive (exFAT or native filesystem)
   versions.env          # pinned versions (edit + rebuild to bump)
   launchers/            # copied to the drive root by build.sh
@@ -51,15 +54,15 @@ PortableAgents/
 ```
 
 The **repo** holds scripts + config templates; the heavy binaries are downloaded into `dist/` at build
-time (or straight onto your USB), so they're never committed. `config/.claude/` is vendored from
-flow0 at build time and also gitignored.
+time (or straight onto your USB), so they're never committed. `config/.claude/` (vendored from flow0
+when `FLOW0_DIR` is set) is gitignored, as are any `.secrets/` and `skills/` folders.
 
 ## How to build
 
 ### Prerequisites
 - macOS or Linux (the build host)
 - `curl`, `tar`, `unzip`, `python3`, `rsync`
-- `flow0` at `~/_code/_flow0` (or set `FLOW0_DIR` env var)
+- **Optional (full mode only):** a `flow0` checkout — set `FLOW0_DIR=/path/to/flow0` to bundle its `.claude` skills/agents/app. Omit it for a lean CLIs-only drive.
 - ~6 GB free disk space (all 4 platforms)
 
 ### Build & deploy
@@ -75,10 +78,11 @@ bash deploy.sh ./dist /Volumes/USB --exfat  # exFAT USB: flatten symlinks (porta
 bash deploy.sh ./dist /mnt/ext              # APFS/ext4/NTFS: keep links (compact)
 ```
 
-`build.sh` downloads Node/Python/Git/Chrome for all four targets, cross-installs Claude+Codex,
-installs the skills' Python deps as **per-platform wheels** (offline on every OS), vendors
-`flow0/.claude` (excluding secrets), and builds the web app (static client + a compiled Node server).
-Re-running is incremental (skips what's already built).
+`build.sh` downloads Node/Python/Git/Chrome for all four targets and cross-installs Claude+Codex.
+**If `FLOW0_DIR` is set** to a flow0 checkout, it also vendors `flow0/.claude` (excluding secrets),
+installs the skills' Python deps as **per-platform wheels** (offline on every OS), and builds the web
+app (static client + compiled Node server). **If `FLOW0_DIR` is unset**, all of that is skipped and
+you get a lean drive with just the CLIs + runtimes. Re-running is incremental (skips what's already built).
 
 ### What the build copies
 
@@ -88,7 +92,7 @@ Re-running is incremental (skips what's already built).
 | `config/projects_list.json` | `config/.claude/` | With `__ROOT__` placeholder → patched at runtime |
 | `config/project_config.yaml` | `config/.claude/` | With `__ROOT__` placeholder → patched at runtime |
 | `config/CLAUDE.md` | `config/` | Agent run-context instructions |
-| Flow0 `.claude/` | `config/.claude/` | Skills, agents, app, commands (secrets excluded) |
+| Flow0 `.claude/` *(only if `FLOW0_DIR` set)* | `config/.claude/` | Skills, agents, app, commands (secrets excluded) |
 | Generated `env.sh/.bat` | `config/` | API key placeholders (only if not already present) |
 | `config/deepseek_env.sh/.bat` | `config/` | DeepSeek config (only if not already present) |
 
