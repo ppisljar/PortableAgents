@@ -119,6 +119,48 @@ for T in $TARGETS; do
   done
 done
 
+# ── launch shims per target ──────────────────────────────────────────────────
+# npm's node_modules/.bin shims are generated for the BUILD host only: on a
+# cross-build they carry the wrong platform, and on exFAT (no symlinks) they
+# degrade to plain-file copies of the "native binary not installed" stub. On top
+# of that, claude-code ships bin/claude.exe as a ~500B placeholder that its
+# postinstall replaces with the platform-native binary — but postinstall runs on
+# the build host, so the target's binary is never placed. Net result on Windows:
+# `claude` isn't found, and the placeholder .exe is "not a valid Win32 app".
+#
+# So we bypass .bin entirely: emit our own correctly-named shims that exec the
+# real, already-downloaded native binaries in place. No copies, no symlinks.
+#   - claude: a compiled native binary at .../@anthropic-ai/claude-code-<plat>/claude[.exe]
+#   - codex:  a node wrapper (bin/codex.js) that resolves its own native binary
+say "launch shims (per target — bypass host-only npm .bin)"
+claude_native(){ case "$1" in
+  win-x64) echo win32-x64 ;;      linux-x64) echo linux-x64 ;;
+  darwin-x64) echo darwin-x64 ;;  darwin-arm64) echo darwin-arm64 ;; esac; }
+for T in $TARGETS; do
+  SH="$OUT/tools/$T/shims"; mkdir -p "$SH"
+  NP="$(claude_native "$T")"
+  case "$T" in
+    win-x64)
+      # %~dp0 has a trailing "\"; shims live in tools\<T>\shims\ so ..\ is tools\<T>\
+      printf '@echo off\r\n"%%~dp0..\\claude-code\\node_modules\\@anthropic-ai\\claude-code-%s\\claude.exe" %%*\r\n' "$NP" > "$SH/claude.cmd"
+      printf '@echo off\r\nnode "%%~dp0..\\codex\\node_modules\\@openai\\codex\\bin\\codex.js" %%*\r\n' > "$SH/codex.cmd"
+      ;;
+    *)
+      cat > "$SH/claude" <<EOF
+#!/bin/sh
+DIR="\$(CDPATH= cd "\$(dirname "\$0")/.." && pwd)"
+exec "\$DIR/claude-code/node_modules/@anthropic-ai/claude-code-$NP/claude" "\$@"
+EOF
+      cat > "$SH/codex" <<'EOF'
+#!/bin/sh
+DIR="$(CDPATH= cd "$(dirname "$0")/.." && pwd)"
+exec node "$DIR/codex/node_modules/@openai/codex/bin/codex.js" "$@"
+EOF
+      chmod +x "$SH/claude" "$SH/codex"
+      ;;
+  esac
+done
+
 # ── vendor flow0 .claude (skills, app, agents, commands) — no secrets/junk ───
 say "vendor $FLOW0_DIR/.claude -> config/.claude"
 [ -d "$FLOW0_DIR/.claude" ] || { echo "FLOW0_DIR/.claude not found: $FLOW0_DIR"; exit 1; }
@@ -129,6 +171,9 @@ rsync -a --delete \
   "$FLOW0_DIR/.claude/" "$OUT/config/.claude/"
 # secret-provider template so the layout is discoverable (real secrets provided on the drive)
 mkdir -p "$OUT/config/.claude/.secrets"
+# self-guarding .gitignore: never commit anything in the secrets folder (except this rule)
+printf '%s\n' '# Never commit secrets. Ignore everything in this folder except this file.' '*' '!.gitignore' \
+  > "$OUT/config/.claude/.secrets/.gitignore"
 [ -f "$OUT/config/.claude/.secrets/service-provider.json" ] || \
   echo '{ "network": { "unifi": {}, "fritzbox": {} } }' > "$OUT/config/.claude/.secrets/service-provider.json.example"
 

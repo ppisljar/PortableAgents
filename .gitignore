@@ -4,5 +4,9 @@
 /tools/
 /staging/
 config/.claude/
+# Never commit secrets — ignore any .secrets/ folder anywhere in the tree
+**/.secrets/
+# Skills are vendored at build time, not tracked (for now)
+**/skills/
 *.log
 .DS_Store

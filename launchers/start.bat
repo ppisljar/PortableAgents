@@ -7,7 +7,7 @@ set "B=%ROOT%bin\%T%"
 if not exist "%B%\node\node.exe" ( echo No bundled Node for %T% - run build.sh first. & pause & exit /b 1 )
 
 set "CHROME=%B%\chrome\chrome.exe"
-set "PATH=%B%\node;%B%\git\cmd;%B%\git\mingw64\bin;%B%\python;%ROOT%tools\%T%\claude-code\node_modules\.bin;%ROOT%tools\%T%\codex\node_modules\.bin;%PATH%"
+set "PATH=%B%\node;%B%\git\cmd;%B%\git\mingw64\bin;%B%\python;%ROOT%tools\%T%\shims;%PATH%"
 set "CHROME_BIN=%CHROME%"
 set "PUPPETEER_EXECUTABLE_PATH=%CHROME%"
 set "CHROME_PATH=%CHROME%"
