@@ -8,7 +8,7 @@ if not exist "%B%\node\node.exe" ( echo No bundled Node for %T% - run build.sh f
 
 set "CHROME=%B%\chrome\chrome.exe"
 REM shims first: the drive's own launchers must outrank anything npm drops into bin\node
-set "PATH=%ROOT%tools\%T%\shims;%B%\node;%B%\git\cmd;%B%\git\mingw64\bin;%B%\python;%PATH%"
+set "PATH=%ROOT%tools\%T%\shims;%B%\extras;%B%\node;%B%\git\cmd;%B%\git\mingw64\bin;%B%\python;%PATH%"
 set "CHROME_BIN=%CHROME%"
 set "PUPPETEER_EXECUTABLE_PATH=%CHROME%"
 set "CHROME_PATH=%CHROME%"
@@ -29,6 +29,7 @@ if exist "%ROOT%config\env.bat" call "%ROOT%config\env.bat"
 echo ======================================
 echo   PortableAgents (win-x64)
 echo   claude ^| codex ^| git ^| python ^| node
+echo   extras: rg fd bat jq uv gh delta micro pandoc ffmpeg
 echo   chrome at: %CHROME%
 echo   web app:   start_web.bat
 echo ======================================

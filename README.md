@@ -22,8 +22,30 @@ and a bundled web app with a `start_web` launcher.
 | **Chrome** | Google **Chrome for Testing** | browser-automation skills (playwright/patchright, scraping) |
 | **Claude Code** | npm `@anthropic-ai/claude-code` | the agent |
 | **Codex** | npm `@openai/codex` | the agent |
+| **Extra CLIs** | latest GitHub releases (see below) | agent/dev conveniences on PATH |
 
 Targets: `linux-x64`, `win-x64`, `darwin-x64`, `darwin-arm64`.
+
+### Extra CLI tools (`bin/<target>/extras`, on PATH)
+
+Relocatable single binaries pulled from each project's **latest** GitHub release and
+prepended to PATH by the launchers:
+
+| Tool | Purpose |
+|---|---|
+| **ripgrep** (`rg`) / **fd** | fast code + file search |
+| **bat** | syntax-highlighted `cat` |
+| **jq** | JSON processing in scripts |
+| **uv** (+ `uvx`) | fast Python env/dependency manager (pairs with the bundled Python) |
+| **gh** | GitHub CLI (PRs, issues, releases) |
+| **delta** | side-by-side git diffs |
+| **micro** | friendly terminal editor |
+| **pandoc** | document conversion (backs the docx/pdf/pptx skills) |
+| **ffmpeg** / **ffprobe** | media processing |
+
+A few tools have no build for every target — currently **fd, delta, micro have no
+Intel-mac (`darwin-x64`) release**, so they're skipped there; the build still succeeds.
+Extras add ~1.5 GB per full build (pandoc ~190 MB and ffmpeg ~80 MB dominate).
 
 ### Is the web app self-contained? Yes — Node only.
 `.claude/app` (`claude-session-viewer`) is **fully Node.js** — a Vite/React client + a `tsx`/Node
@@ -52,6 +74,7 @@ PortableAgents/
     deepseek_env.sh/.bat # DeepSeek API key + endpoint config (edit with your key)
     CLAUDE.md            # portable-run guidance for the agent
   dist/ bin/ tools/     # build outputs (gitignored): the actual portable payload
+                        #   bin/<target>/extras/ = rg, fd, bat, jq, uv, gh, delta, micro, pandoc, ffmpeg
 ```
 
 The **repo** holds scripts + config templates; the heavy binaries are downloaded into `dist/` at build
@@ -64,14 +87,14 @@ when `FLOW0_DIR` is set) is gitignored, as are any `.secrets/` and `skills/` fol
 - macOS or Linux (the build host)
 - `curl`, `tar`, `unzip`, `python3`, `rsync`
 - **Optional (full mode only):** a `flow0` checkout — set `FLOW0_DIR=/path/to/flow0` to bundle its `.claude` skills/agents/app. Omit it for a lean CLIs-only drive.
-- ~6 GB free disk space (all 4 platforms)
+- ~8 GB free disk space (all 4 platforms, including the extra CLIs)
 
 ### Build & deploy
 
 Build to a normal filesystem first (the build needs symlinks), then deploy onto your drive:
 
 ```bash
-# 1. Build the payload (~6 GB, downloads all runtimes + installs agents)
+# 1. Build the payload (~8 GB, downloads all runtimes + extra CLIs + installs agents)
 bash build.sh ./dist
 
 # 2. Deploy to drive

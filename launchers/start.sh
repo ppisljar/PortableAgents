@@ -19,7 +19,7 @@ case "$T" in
   darwin-*)   CHROME="$B/chrome/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing" ;;
 esac
 
-export PATH="$B/node/bin:$B/git/bin:$B/python/bin:$ROOT/tools/$T/shims:$PATH"
+export PATH="$B/node/bin:$B/git/bin:$B/python/bin:$B/extras:$ROOT/tools/$T/shims:$PATH"
 [ -d "$B/git/libexec/git-core" ] && export GIT_EXEC_PATH="$B/git/libexec/git-core"
 [ -d "$B/git/share/git-core/templates" ] && export GIT_TEMPLATE_DIR="$B/git/share/git-core/templates"
 export CHROME_BIN="$CHROME" PUPPETEER_EXECUTABLE_PATH="$CHROME" CHROME_PATH="$CHROME"
@@ -40,6 +40,7 @@ done
 echo " ======================================"
 echo "  PortableAgents ($T)"
 echo "  claude | codex | git | python | node"
+echo "  extras: rg fd bat jq uv gh delta micro pandoc ffmpeg"
 echo "  chrome at: \$CHROME_BIN"
 echo "  web app:   bash start_web.sh"
 echo " ======================================"

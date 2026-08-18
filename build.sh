@@ -22,11 +22,13 @@ need(){ command -v "$1" >/dev/null 2>&1 || { echo "missing tool: $1"; exit 1; };
 need curl; need tar; need unzip; need python3; need rsync
 
 gh_asset(){  # <owner/repo> <tag|latest> <python-regex over asset name> -> download URL
-  local repo="$1" tag="$2" pat="$3" api
+  local repo="$1" tag="$2" pat="$3" api cache
   [ "$tag" = latest ] && api="https://api.github.com/repos/$repo/releases/latest" \
                       || api="https://api.github.com/repos/$repo/releases/tags/$tag"
-  curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} "$api" \
-   | python3 -c 'import json,sys,re;d=json.load(sys.stdin);p=re.compile(sys.argv[1]);print(next(a["browser_download_url"] for a in d.get("assets",[]) if p.search(a["name"])))' "$pat"
+  # cache the release JSON per repo+tag: resolving many assets (one per target) then costs no extra API calls
+  cache="$STAGE/ghapi-$(printf '%s' "$repo-$tag" | tr '/ ' '__').json"
+  [ -s "$cache" ] || curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} "$api" -o "$cache"
+  python3 -c 'import json,sys,re;d=json.load(open(sys.argv[1]));p=re.compile(sys.argv[2]);print(next(a["browser_download_url"] for a in d.get("assets",[]) if p.search(a["name"])))' "$cache" "$pat"
 }
 
 # platform token maps (target -> per-source token)
@@ -159,6 +161,66 @@ EOF
       chmod +x "$SH/claude" "$SH/codex"
       ;;
   esac
+done
+
+# ── extra CLI tools, per target ──────────────────────────────────────────────
+# ripgrep/fd/bat/jq/uv/gh/delta/micro/pandoc/ffmpeg — relocatable binaries dropped
+# into bin/<T>/extras (the launchers prepend it to PATH). Pulled from each project's
+# latest GitHub release, so they track upstream. A few have no build for some targets
+# (e.g. no Intel-mac micro or delta) — those are skipped with a note; the build still
+# succeeds. Best-effort: a download/extract failure skips that tool, never aborts.
+say "extra CLI tools (ripgrep, fd, bat, jq, uv, gh, delta, micro, pandoc, ffmpeg)"
+rust_triple(){ case "$1" in
+  win-x64)      echo x86_64-pc-windows-msvc ;;
+  linux-x64)    echo x86_64-unknown-linux-musl ;;
+  darwin-x64)   echo x86_64-apple-darwin ;;
+  darwin-arm64) echo aarch64-apple-darwin ;; esac; }
+
+# install_archive <T> <url> <binname...> : download+extract, copy each named binary into extras/
+install_archive(){
+  local T="$1" url="$2"; shift 2
+  local E="$OUT/bin/$T/extras"; mkdir -p "$E"
+  local arc="$STAGE/$(basename "$url")" tmp="$STAGE/x-extract-$T-$$"
+  dl "$url" "$arc"; extract "$arc" "$tmp"
+  local b f
+  for b in "$@"; do
+    f="$(find "$tmp" -type f \( -name "$b" -o -name "$b.exe" \) | head -1)"
+    if [ -n "$f" ]; then cp "$f" "$E/$(basename "$f")"; chmod +x "$E/$(basename "$f")" 2>/dev/null || true
+    else echo "    (warn: $b not found in $(basename "$url"))"; fi
+  done
+  rm -rf "$tmp" "$arc"
+}
+# install_raw <T> <url> <outname> : download a bare single-file binary into extras/
+install_raw(){
+  local T="$1" url="$2" out="$3" E="$OUT/bin/$1/extras"; mkdir -p "$E"
+  dl "$url" "$E/$out"; chmod +x "$E/$out" 2>/dev/null || true
+}
+
+for T in $TARGETS; do
+  echo "  [$T] extras"
+  RT="$(rust_triple "$T")"; U=""
+  # rust single-binary tools (archive; binary lives inside a flattened dir)
+  U="$(gh_asset BurntSushi/ripgrep latest "ripgrep-.*-${RT}\\.(tar\\.gz|zip)$" 2>/dev/null)" && install_archive "$T" "$U" rg     || echo "    skip ripgrep"
+  U="$(gh_asset sharkdp/fd        latest "fd-.*-${RT}\\.(tar\\.gz|zip)$"      2>/dev/null)" && install_archive "$T" "$U" fd     || echo "    skip fd"
+  U="$(gh_asset sharkdp/bat       latest "bat-.*-${RT}\\.(tar\\.gz|zip)$"     2>/dev/null)" && install_archive "$T" "$U" bat    || echo "    skip bat"
+  U="$(gh_asset astral-sh/uv      latest "uv-${RT}\\.(tar\\.gz|zip)$"         2>/dev/null)" && install_archive "$T" "$U" uv uvx || echo "    skip uv"
+  U="$(gh_asset dandavison/delta  latest "delta-.*-${RT}\\.(tar\\.gz|zip)$"   2>/dev/null)" && install_archive "$T" "$U" delta  || echo "    skip delta (no build for $T)"
+  # jq — bare per-OS binary
+  case "$T" in win-x64) JQ=jq-windows-amd64.exe;; linux-x64) JQ=jq-linux-amd64;; darwin-x64) JQ=jq-macos-amd64;; darwin-arm64) JQ=jq-macos-arm64;; esac
+  U="$(gh_asset jqlang/jq latest "^${JQ}$" 2>/dev/null)" && { case "$T" in win-x64) install_raw "$T" "$U" jq.exe;; *) install_raw "$T" "$U" jq;; esac; } || echo "    skip jq"
+  # gh — go naming; binary at bin/gh inside the archive
+  case "$T" in win-x64) GT=windows_amd64;; linux-x64) GT=linux_amd64;; darwin-x64) GT=macOS_amd64;; darwin-arm64) GT=macOS_arm64;; esac
+  U="$(gh_asset cli/cli latest "gh_.*_${GT}\\.(tar\\.gz|zip)$" 2>/dev/null)" && install_archive "$T" "$U" gh || echo "    skip gh"
+  # micro — no Intel-mac build
+  case "$T" in win-x64) MT=win64;; linux-x64) MT=linux64-static;; darwin-x64) MT="";; darwin-arm64) MT=macos-arm64;; esac
+  { [ -n "$MT" ] && U="$(gh_asset zyedidia/micro latest "micro-.*-${MT}\\.(tar\\.gz|zip)$" 2>/dev/null)" && install_archive "$T" "$U" micro; } || echo "    skip micro (no build for $T)"
+  # pandoc
+  case "$T" in win-x64) PT=windows-x86_64;; linux-x64) PT=linux-amd64;; darwin-x64) PT=x86_64-macOS;; darwin-arm64) PT=arm64-macOS;; esac
+  U="$(gh_asset jgm/pandoc latest "pandoc-.*-${PT}\\.(tar\\.gz|zip)$" 2>/dev/null)" && install_archive "$T" "$U" pandoc || echo "    skip pandoc"
+  # ffmpeg + ffprobe — bare binaries; the Windows asset carries no .exe suffix
+  case "$T" in win-x64) FT=win32-x64;; linux-x64) FT=linux-x64;; darwin-x64) FT=darwin-x64;; darwin-arm64) FT=darwin-arm64;; esac
+  U="$(gh_asset eugeneware/ffmpeg-static latest "^ffmpeg-${FT}$"  2>/dev/null)" && { case "$T" in win-x64) install_raw "$T" "$U" ffmpeg.exe;;  *) install_raw "$T" "$U" ffmpeg;;  esac; } || echo "    skip ffmpeg"
+  U="$(gh_asset eugeneware/ffmpeg-static latest "^ffprobe-${FT}$" 2>/dev/null)" && { case "$T" in win-x64) install_raw "$T" "$U" ffprobe.exe;; *) install_raw "$T" "$U" ffprobe;; esac; } || echo "    skip ffprobe"
 done
 
 # ── vendor flow0 .claude (skills, app, agents, commands) — OPTIONAL ──────────
