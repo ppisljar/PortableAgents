@@ -184,7 +184,9 @@ install_archive(){
   dl "$url" "$arc"; extract "$arc" "$tmp"
   local b f
   for b in "$@"; do
-    f="$(find "$tmp" -type f \( -name "$b" -o -name "$b.exe" \) | head -1)"
+    # prefer the .exe (Windows archives may also ship a same-named text/script file)
+    f="$(find "$tmp" -type f -name "$b.exe" | head -1)"
+    [ -n "$f" ] || f="$(find "$tmp" -type f -name "$b" | head -1)"
     if [ -n "$f" ]; then cp "$f" "$E/$(basename "$f")"; chmod +x "$E/$(basename "$f")" 2>/dev/null || true
     else echo "    (warn: $b not found in $(basename "$url"))"; fi
   done
