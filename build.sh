@@ -234,6 +234,12 @@ for T in $TARGETS; do
   # gitleaks — secret scanner
   case "$T" in win-x64) GK=windows_x64;; linux-x64) GK=linux_x64;; darwin-x64) GK=darwin_x64;; darwin-arm64) GK=darwin_arm64;; esac
   U="$(gh_asset gitleaks/gitleaks latest "gitleaks_.*_${GK}\\.(tar\\.gz|zip)$" 2>/dev/null)" && install_archive "$T" "$U" gitleaks || echo "    skip gitleaks"
+  # rclone — cloud + local file sync (rsync-style, but cross-platform)
+  case "$T" in win-x64) RC=windows-amd64;; linux-x64) RC=linux-amd64;; darwin-x64) RC=osx-amd64;; darwin-arm64) RC=osx-arm64;; esac
+  U="$(gh_asset rclone/rclone latest "rclone-.*-${RC}\\.zip$" 2>/dev/null)" && install_archive "$T" "$U" rclone || echo "    skip rclone"
+  # syncthing — continuous file sync with a local web UI
+  case "$T" in win-x64) SY=windows-amd64;; linux-x64) SY=linux-amd64;; darwin-x64) SY=macos-amd64;; darwin-arm64) SY=macos-arm64;; esac
+  U="$(gh_asset syncthing/syncthing latest "syncthing-${SY}-v.*\\.(tar\\.gz|zip)$" 2>/dev/null)" && install_archive "$T" "$U" syncthing || echo "    skip syncthing"
   # 7-Zip (7zz) — unix from the .tar.xz; Windows is an installer, handled after the loop
   case "$T" in linux-x64) Z7=linux-x64;; darwin-x64|darwin-arm64) Z7=mac;; *) Z7="";; esac
   { [ -n "$Z7" ] && U="$(gh_asset ip7z/7zip latest "^7z.*-${Z7}\\.tar\\.xz$" 2>/dev/null)" && install_archive "$T" "$U" 7zz; } || echo "    skip 7zip on $T (Windows handled after the loop)"
@@ -259,6 +265,39 @@ if echo " $TARGETS " | grep -q " win-x64 "; then
     echo "  [win-x64] 7-Zip skipped (host 7zz unavailable)"
   fi
 fi
+
+# ── VS Code (portable), per target ───────────────────────────────────────────
+# GUI editor from the official update.code.visualstudio.com archives, into
+# bin/<T>/vscode and launched via code.sh/.bat. Portable mode keeps all user data
+# on the drive: a "data" dir inside the app folder (win/linux), or a sibling
+# "code-portable-data" next to the .app (macOS).
+say "VS Code (portable, per target)"
+vscode_slug(){ case "$1" in
+  win-x64)      echo win32-x64-archive ;;
+  linux-x64)    echo linux-x64 ;;
+  darwin-x64)   echo darwin ;;
+  darwin-arm64) echo darwin-arm64 ;; esac; }
+for T in $TARGETS; do
+  VD="$OUT/bin/$T/vscode"
+  if [ -e "$VD/bin/code" ] || [ -e "$VD/Code.exe" ] || [ -e "$VD/Visual Studio Code.app" ]; then
+    echo "  [$T] vscode: present"; continue
+  fi
+  url="https://update.code.visualstudio.com/latest/$(vscode_slug "$T")/stable"
+  case "$T" in win-x64|darwin*) arc="$STAGE/vscode-$T.zip";; *) arc="$STAGE/vscode-$T.tar.gz";; esac
+  echo "  [$T] vscode: $url"
+  if dl "$url" "$arc"; then
+    rm -rf "$VD"; mkdir -p "$VD"
+    case "$T" in
+      darwin*) unzip -q "$arc" -d "$VD" ;;   # keep the "Visual Studio Code.app" bundle intact
+      *)       extract "$arc" "$VD" ;;        # win: files at root; linux: flatten the top dir
+    esac
+    case "$T" in
+      darwin*) mkdir -p "$VD/code-portable-data" ;;   # sibling of the .app -> portable mode
+      *)       mkdir -p "$VD/data" ;;                  # data dir inside app folder -> portable mode
+    esac
+    rm -f "$arc"
+  else echo "    (vscode download failed for $T — skipped)"; fi
+done
 
 # ── vendor flow0 .claude (skills, app, agents, commands) — OPTIONAL ──────────
 # Set FLOW0_DIR=/path/to/flow0 to bundle the flow app + skills. If it is unset or

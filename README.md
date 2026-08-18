@@ -5,7 +5,7 @@ Run **Claude Code + OpenAI Codex** from a portable drive, on **Windows, Linux, a
 drive.
 
 **Two build modes:**
-- **Lean (default):** just the CLIs + portable runtimes (Node/Git/Python/Chrome). Nothing extra needed — clone and build.
+- **Lean (default):** the CLIs + portable runtimes (Node/Git/Python/Chrome), the extra CLI tools, and portable VS Code. Nothing else needed — clone and build.
 - **Full (opt-in):** set `FLOW0_DIR=/path/to/flow0` to also bundle the **flow0 `.claude`** (skills, agents, commands) and the **Claude session-viewer web app**.
 
 Inspired by [portable-agent-usb](https://github.com/bnovik0v/portable-agent-usb), extended with:
@@ -22,6 +22,7 @@ and a bundled web app with a `start_web` launcher.
 | **Chrome** | Google **Chrome for Testing** | browser-automation skills (playwright/patchright, scraping) |
 | **Claude Code** | npm `@anthropic-ai/claude-code` | the agent |
 | **Codex** | npm `@openai/codex` | the agent |
+| **VS Code** | official portable archives (`update.code.visualstudio.com`) | GUI editor, launched via `code.sh/.bat` (portable data on the drive) |
 | **Extra CLIs** | latest GitHub releases (see below) | agent/dev conveniences on PATH |
 
 Targets: `linux-x64`, `win-x64`, `darwin-x64`, `darwin-arm64`.
@@ -47,12 +48,15 @@ prepended to PATH by the launchers:
 | **7-Zip** (`7zz`, `7z.exe`) | archive create/extract |
 | **age** (+ `age-keygen`) / **sops** | file & secrets encryption |
 | **gitleaks** | scan for committed secrets |
+| **rclone** | cloud + local file sync (cross-platform, rsync-style) |
+| **syncthing** | continuous file sync with a local web UI |
 
 A few tools have no build for every target, so they're skipped there (the build still
 succeeds): **fd, delta, micro** have no Intel-mac (`darwin-x64`) release, and **dust** has
 no Apple-silicon (`darwin-arm64`) release. **7-Zip** ships only an installer on Windows, so
 its `7z.exe`/`7z.dll` are extracted from that installer using the host's own `7zz` at build
-time. Extras add ~1.5 GB per full build (pandoc ~190 MB and ffmpeg ~80 MB dominate).
+time. Extras add ~1.5 GB per full build (pandoc ~190 MB and ffmpeg ~80 MB dominate),
+plus bundled VS Code at ~130 MB/target (~520 MB across all four).
 
 ### Is the web app self-contained? Yes — Node only.
 `.claude/app` (`claude-session-viewer`) is **fully Node.js** — a Vite/React client + a `tsx`/Node
@@ -72,6 +76,7 @@ PortableAgents/
     claude.sh/.bat        # start Claude Code directly (Anthropic API)
     codex.sh/.bat         # start Codex directly (OpenAI API)
     chrome.sh/.bat        # launch the bundled Chrome (drive-local profile)
+    code.sh/.bat          # launch the bundled VS Code (portable data on the drive)
     claude-deepseek.sh/.bat  # start Claude Code via DeepSeek's Anthropic-compatible endpoint
     codex-deepseek.sh/.bat   # start Codex via DeepSeek's OpenAI-compatible endpoint
   config/
@@ -81,7 +86,8 @@ PortableAgents/
     deepseek_env.sh/.bat # DeepSeek API key + endpoint config (edit with your key)
     CLAUDE.md            # portable-run guidance for the agent
   dist/ bin/ tools/     # build outputs (gitignored): the actual portable payload
-                        #   bin/<target>/extras/ = rg fd bat jq yq uv gh delta micro glow pandoc ffmpeg dust 7zz age sops gitleaks
+                        #   bin/<target>/extras/ = rg fd bat jq yq uv gh delta micro glow pandoc ffmpeg dust 7zz age sops gitleaks rclone syncthing
+                        #   bin/<target>/{chrome,vscode}/ = bundled GUI apps (launched via chrome.* / code.*)
 ```
 
 The **repo** holds scripts + config templates; the heavy binaries are downloaded into `dist/` at build
@@ -94,14 +100,14 @@ when `FLOW0_DIR` is set) is gitignored, as are any `.secrets/` and `skills/` fol
 - macOS or Linux (the build host)
 - `curl`, `tar`, `unzip`, `python3`, `rsync`
 - **Optional (full mode only):** a `flow0` checkout — set `FLOW0_DIR=/path/to/flow0` to bundle its `.claude` skills/agents/app. Omit it for a lean CLIs-only drive.
-- ~8 GB free disk space (all 4 platforms, including the extra CLIs)
+- ~9 GB free disk space (all 4 platforms, incl. extra CLIs + VS Code)
 
 ### Build & deploy
 
 Build to a normal filesystem first (the build needs symlinks), then deploy onto your drive:
 
 ```bash
-# 1. Build the payload (~8 GB, downloads all runtimes + extra CLIs + installs agents)
+# 1. Build the payload (~9 GB, downloads runtimes + extra CLIs + VS Code + installs agents)
 bash build.sh ./dist
 
 # 2. Deploy to drive
@@ -202,6 +208,7 @@ A minimal template is at `config/.claude/.secrets/service-provider.json.example`
 | `claude.sh` / `claude.bat` | Anthropic | OAuth or env key | Direct Claude Code sessions |
 | `codex.sh` / `codex.bat` | OpenAI | Env key | Direct Codex sessions |
 | `chrome.sh` / `chrome.bat` | N/A | N/A | Launch bundled Chrome (portable profile) |
+| `code.sh` / `code.bat` | N/A | N/A | Launch bundled VS Code (portable data) |
 | `claude-deepseek.sh` / `.bat` | DeepSeek (Anthropic-compatible) | DeepSeek key | Claude via DeepSeek |
 | `codex-deepseek.sh` / `.bat` | DeepSeek (OpenAI-compatible) | DeepSeek key | Codex via DeepSeek |
 

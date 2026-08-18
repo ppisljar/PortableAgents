@@ -29,8 +29,8 @@ if exist "%ROOT%config\env.bat" call "%ROOT%config\env.bat"
 echo ======================================
 echo   PortableAgents (win-x64)
 echo   claude ^| codex ^| git ^| python ^| node
-echo   extras: rg fd bat jq yq uv gh delta micro glow pandoc ffmpeg dust 7z age sops gitleaks
-echo   chrome at: %CHROME%
+echo   extras: rg fd bat jq yq uv gh delta micro glow pandoc ffmpeg dust 7z age sops gitleaks rclone syncthing
+echo   apps:   chrome.bat ^| code.bat (VS Code)
 echo   web app:   start_web.bat
 echo ======================================
 if "%ANTHROPIC_API_KEY%"=="YOUR_KEY_HERE" echo   (no API key set - 'claude' will prompt OAuth login)

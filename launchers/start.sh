@@ -40,8 +40,8 @@ done
 echo " ======================================"
 echo "  PortableAgents ($T)"
 echo "  claude | codex | git | python | node"
-echo "  extras: rg fd bat jq yq uv gh delta micro glow pandoc ffmpeg dust 7zz age sops gitleaks"
-echo "  chrome at: \$CHROME_BIN"
+echo "  extras: rg fd bat jq yq uv gh delta micro glow pandoc ffmpeg dust 7zz age sops gitleaks rclone syncthing"
+echo "  apps:   bash chrome.sh | bash code.sh (VS Code)"
 echo "  web app:   bash start_web.sh"
 echo " ======================================"
 [ "${ANTHROPIC_API_KEY:-YOUR_KEY_HERE}" = "YOUR_KEY_HERE" ] && \
