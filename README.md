@@ -42,6 +42,7 @@ PortableAgents/
     start_web.sh/.bat     # launch the session-viewer web app
     claude.sh/.bat        # start Claude Code directly (Anthropic API)
     codex.sh/.bat         # start Codex directly (OpenAI API)
+    chrome.sh/.bat        # launch the bundled Chrome (drive-local profile)
     claude-deepseek.sh/.bat  # start Claude Code via DeepSeek's Anthropic-compatible endpoint
     codex-deepseek.sh/.bat   # start Codex via DeepSeek's OpenAI-compatible endpoint
   config/
@@ -170,6 +171,7 @@ A minimal template is at `config/.claude/.secrets/service-provider.json.example`
 | `start_web.sh` / `start_web.bat` | N/A | N/A | View conversations, diagrams |
 | `claude.sh` / `claude.bat` | Anthropic | OAuth or env key | Direct Claude Code sessions |
 | `codex.sh` / `codex.bat` | OpenAI | Env key | Direct Codex sessions |
+| `chrome.sh` / `chrome.bat` | N/A | N/A | Launch bundled Chrome (portable profile) |
 | `claude-deepseek.sh` / `.bat` | DeepSeek (Anthropic-compatible) | DeepSeek key | Claude via DeepSeek |
 | `codex-deepseek.sh` / `.bat` | DeepSeek (OpenAI-compatible) | DeepSeek key | Codex via DeepSeek |
 
