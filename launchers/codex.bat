@@ -9,7 +9,8 @@ if not exist "%B%\node\node.exe" ( echo No bundled Node for %T% - run build.sh f
 
 REM --- PATH + bundled runtimes ------------------------------------------------
 set "CHROME=%B%\chrome\chrome.exe"
-set "PATH=%B%\node;%B%\git\cmd;%B%\git\mingw64\bin;%B%\python;%ROOT%tools\%T%\shims;%PATH%"
+REM shims first: the drive's own launchers must outrank anything npm drops into bin\node
+set "PATH=%ROOT%tools\%T%\shims;%B%\node;%B%\git\cmd;%B%\git\mingw64\bin;%B%\python;%PATH%"
 set "CHROME_BIN=%CHROME%"
 set "PUPPETEER_EXECUTABLE_PATH=%CHROME%"
 set "CHROME_PATH=%CHROME%"
