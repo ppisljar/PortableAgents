@@ -35,17 +35,24 @@ prepended to PATH by the launchers:
 |---|---|
 | **ripgrep** (`rg`) / **fd** | fast code + file search |
 | **bat** | syntax-highlighted `cat` |
-| **jq** | JSON processing in scripts |
+| **jq** / **yq** | JSON / YAML-TOML-XML processing in scripts |
 | **uv** (+ `uvx`) | fast Python env/dependency manager (pairs with the bundled Python) |
 | **gh** | GitHub CLI (PRs, issues, releases) |
 | **delta** | side-by-side git diffs |
 | **micro** | friendly terminal editor |
+| **glow** | render markdown in the terminal |
 | **pandoc** | document conversion (backs the docx/pdf/pptx skills) |
 | **ffmpeg** / **ffprobe** | media processing |
+| **dust** | disk-usage explorer (handy on the drive itself) |
+| **7-Zip** (`7zz`, `7z.exe`) | archive create/extract |
+| **age** (+ `age-keygen`) / **sops** | file & secrets encryption |
+| **gitleaks** | scan for committed secrets |
 
-A few tools have no build for every target — currently **fd, delta, micro have no
-Intel-mac (`darwin-x64`) release**, so they're skipped there; the build still succeeds.
-Extras add ~1.5 GB per full build (pandoc ~190 MB and ffmpeg ~80 MB dominate).
+A few tools have no build for every target, so they're skipped there (the build still
+succeeds): **fd, delta, micro** have no Intel-mac (`darwin-x64`) release, and **dust** has
+no Apple-silicon (`darwin-arm64`) release. **7-Zip** ships only an installer on Windows, so
+its `7z.exe`/`7z.dll` are extracted from that installer using the host's own `7zz` at build
+time. Extras add ~1.5 GB per full build (pandoc ~190 MB and ffmpeg ~80 MB dominate).
 
 ### Is the web app self-contained? Yes — Node only.
 `.claude/app` (`claude-session-viewer`) is **fully Node.js** — a Vite/React client + a `tsx`/Node
@@ -74,7 +81,7 @@ PortableAgents/
     deepseek_env.sh/.bat # DeepSeek API key + endpoint config (edit with your key)
     CLAUDE.md            # portable-run guidance for the agent
   dist/ bin/ tools/     # build outputs (gitignored): the actual portable payload
-                        #   bin/<target>/extras/ = rg, fd, bat, jq, uv, gh, delta, micro, pandoc, ffmpeg
+                        #   bin/<target>/extras/ = rg fd bat jq yq uv gh delta micro glow pandoc ffmpeg dust 7zz age sops gitleaks
 ```
 
 The **repo** holds scripts + config templates; the heavy binaries are downloaded into `dist/` at build

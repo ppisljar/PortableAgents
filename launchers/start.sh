@@ -40,7 +40,7 @@ done
 echo " ======================================"
 echo "  PortableAgents ($T)"
 echo "  claude | codex | git | python | node"
-echo "  extras: rg fd bat jq uv gh delta micro pandoc ffmpeg"
+echo "  extras: rg fd bat jq yq uv gh delta micro glow pandoc ffmpeg dust 7zz age sops gitleaks"
 echo "  chrome at: \$CHROME_BIN"
 echo "  web app:   bash start_web.sh"
 echo " ======================================"

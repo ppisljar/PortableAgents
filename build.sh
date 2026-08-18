@@ -169,7 +169,7 @@ done
 # latest GitHub release, so they track upstream. A few have no build for some targets
 # (e.g. no Intel-mac micro or delta) — those are skipped with a note; the build still
 # succeeds. Best-effort: a download/extract failure skips that tool, never aborts.
-say "extra CLI tools (ripgrep, fd, bat, jq, uv, gh, delta, micro, pandoc, ffmpeg)"
+say "extra CLI tools (ripgrep, fd, bat, jq, yq, uv, gh, delta, micro, glow, pandoc, ffmpeg, dust, 7zip, age, sops, gitleaks)"
 rust_triple(){ case "$1" in
   win-x64)      echo x86_64-pc-windows-msvc ;;
   linux-x64)    echo x86_64-unknown-linux-musl ;;
@@ -217,11 +217,53 @@ for T in $TARGETS; do
   # pandoc
   case "$T" in win-x64) PT=windows-x86_64;; linux-x64) PT=linux-amd64;; darwin-x64) PT=x86_64-macOS;; darwin-arm64) PT=arm64-macOS;; esac
   U="$(gh_asset jgm/pandoc latest "pandoc-.*-${PT}\\.(tar\\.gz|zip)$" 2>/dev/null)" && install_archive "$T" "$U" pandoc || echo "    skip pandoc"
+  # glow — markdown viewer (Darwin/Linux/Windows + x86_64/arm64)
+  case "$T" in win-x64) GL=Windows_x86_64;; linux-x64) GL=Linux_x86_64;; darwin-x64) GL=Darwin_x86_64;; darwin-arm64) GL=Darwin_arm64;; esac
+  U="$(gh_asset charmbracelet/glow latest "glow_.*_${GL}\\.(tar\\.gz|zip)$" 2>/dev/null)" && install_archive "$T" "$U" glow || echo "    skip glow"
+  # yq — bare per-OS binary
+  case "$T" in win-x64) YQ=yq_windows_amd64.exe;; linux-x64) YQ=yq_linux_amd64;; darwin-x64) YQ=yq_darwin_amd64;; darwin-arm64) YQ=yq_darwin_arm64;; esac
+  U="$(gh_asset mikefarah/yq latest "^${YQ}$" 2>/dev/null)" && { case "$T" in win-x64) install_raw "$T" "$U" yq.exe;; *) install_raw "$T" "$U" yq;; esac; } || echo "    skip yq"
+  # dust — rust triples; upstream has no Apple-silicon (darwin-arm64) build
+  U="$(gh_asset bootandy/dust latest "dust-.*-${RT}\\.(tar\\.gz|zip)$" 2>/dev/null)" && install_archive "$T" "$U" dust || echo "    skip dust (no build for $T)"
+  # age + age-keygen — modern file encryption
+  case "$T" in win-x64) AG=windows-amd64;; linux-x64) AG=linux-amd64;; darwin-x64) AG=darwin-amd64;; darwin-arm64) AG=darwin-arm64;; esac
+  U="$(gh_asset FiloSottile/age latest "age-.*-${AG}\\.(tar\\.gz|zip)$" 2>/dev/null)" && install_archive "$T" "$U" age age-keygen || echo "    skip age"
+  # sops — bare per-OS binary (secrets encryption, pairs with age)
+  case "$T" in win-x64) SO="\\.amd64\\.exe";; linux-x64) SO="\\.linux\\.amd64";; darwin-x64) SO="\\.darwin\\.amd64";; darwin-arm64) SO="\\.darwin\\.arm64";; esac
+  U="$(gh_asset getsops/sops latest "sops-.*${SO}$" 2>/dev/null)" && { case "$T" in win-x64) install_raw "$T" "$U" sops.exe;; *) install_raw "$T" "$U" sops;; esac; } || echo "    skip sops"
+  # gitleaks — secret scanner
+  case "$T" in win-x64) GK=windows_x64;; linux-x64) GK=linux_x64;; darwin-x64) GK=darwin_x64;; darwin-arm64) GK=darwin_arm64;; esac
+  U="$(gh_asset gitleaks/gitleaks latest "gitleaks_.*_${GK}\\.(tar\\.gz|zip)$" 2>/dev/null)" && install_archive "$T" "$U" gitleaks || echo "    skip gitleaks"
+  # 7-Zip (7zz) — unix from the .tar.xz; Windows is an installer, handled after the loop
+  case "$T" in linux-x64) Z7=linux-x64;; darwin-x64|darwin-arm64) Z7=mac;; *) Z7="";; esac
+  { [ -n "$Z7" ] && U="$(gh_asset ip7z/7zip latest "^7z.*-${Z7}\\.tar\\.xz$" 2>/dev/null)" && install_archive "$T" "$U" 7zz; } || echo "    skip 7zip on $T (Windows handled after the loop)"
   # ffmpeg + ffprobe — bare binaries; the Windows asset carries no .exe suffix
   case "$T" in win-x64) FT=win32-x64;; linux-x64) FT=linux-x64;; darwin-x64) FT=darwin-x64;; darwin-arm64) FT=darwin-arm64;; esac
   U="$(gh_asset eugeneware/ffmpeg-static latest "^ffmpeg-${FT}$"  2>/dev/null)" && { case "$T" in win-x64) install_raw "$T" "$U" ffmpeg.exe;;  *) install_raw "$T" "$U" ffmpeg;;  esac; } || echo "    skip ffmpeg"
   U="$(gh_asset eugeneware/ffmpeg-static latest "^ffprobe-${FT}$" 2>/dev/null)" && { case "$T" in win-x64) install_raw "$T" "$U" ffprobe.exe;; *) install_raw "$T" "$U" ffprobe;; esac; } || echo "    skip ffprobe"
 done
+
+# Windows 7-Zip: its release ships only an installer .exe (no plain binary), so extract
+# 7z.exe + 7z.dll from it using the host's own 7zz (installed for the build platform above).
+if echo " $TARGETS " | grep -q " win-x64 "; then
+  H7="$OUT/bin/$HOST_T/extras/7zz"
+  if [ -x "$H7" ] && ZU="$(gh_asset ip7z/7zip latest "^7z.*-x64\\.exe$" 2>/dev/null)"; then
+    EW="$OUT/bin/win-x64/extras"; mkdir -p "$EW"
+    zi="$STAGE/7zwin.exe"; zt="$STAGE/7zwin"; rm -rf "$zt"; mkdir -p "$zt"
+    dl "$ZU" "$zi"
+    "$H7" x -y -o"$zt" "$zi" >/dev/null 2>&1 || true
+    for b in 7z.exe 7z.dll; do f="$(find "$zt" -name "$b" | head -1)"; [ -n "$f" ] && cp "$f" "$EW/$b"; done
+    rm -rf "$zt" "$zi"
+    [ -f "$EW/7z.exe" ] && echo "  [win-x64] 7-Zip: 7z.exe + 7z.dll" || echo "  [win-x64] 7-Zip: extraction failed — skipped"
+  else
+    echo "  [win-x64] 7-Zip skipped (host 7zz unavailable)"
+  fi
+fi
+
+# ── vendor flow0 .claude (skills, app, agents, commands) — OPTIONAL ──────────
+# Set FLOW0_DIR=/path/to/flow0 to bundle the flow app + skills. If it is unset or
+# missing, the build still succeeds and produces a lean drive with just the CLIs
+# + runtimes (no flow app / skills).
 
 # ── vendor flow0 .claude (skills, app, agents, commands) — OPTIONAL ──────────
 # Set FLOW0_DIR=/path/to/flow0 to bundle the flow app + skills. If it is unset or
