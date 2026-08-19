@@ -323,7 +323,9 @@ if echo " $TARGETS " | grep -q " win-x64 "; then
   [ -n "$WSV" ] && wt_zip winscp "https://winscp.net/download/WinSCP-$WSV-Portable.zip" || echo "  skip winscp (version unresolved)"
   # Nmap + Ncat — distributed only as an NSIS installer now; extract it with the host 7zz
   H7="$OUT/bin/$HOST_T/extras/7zz"
-  NMEXE="$(curl -fsSL https://nmap.org/dist/ 2>/dev/null | grep -oE 'nmap-[0-9.]+-setup\.exe' | sort -V | tail -1)" || true
+  # resolve from the (small, fast) download page — the dist/ archive listing is huge/slow to scrape
+  NMEXE="$(curl -fsSL --max-time 60 https://nmap.org/download.html 2>/dev/null | grep -oE 'nmap-[0-9.]+-setup\.exe' | head -1)" || true
+  NMEXE="${NMEXE:-nmap-7.991-setup.exe}"   # pinned fallback if the page can't be fetched
   if [ -d "$WT/nmap" ]; then echo "  nmap: present"
   elif [ -x "$H7" ] && [ -n "$NMEXE" ]; then
     echo "  nmap: $NMEXE (extract via 7zz)"; ni="$STAGE/nmap-setup.exe"
