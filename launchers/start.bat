@@ -9,6 +9,8 @@ if not exist "%B%\node\node.exe" ( echo No bundled Node for %T% - run build.sh f
 set "CHROME=%B%\chrome\chrome.exe"
 REM shims first: the drive's own launchers must outrank anything npm drops into bin\node
 set "PATH=%ROOT%tools\%T%\shims;%B%\extras;%B%\node;%B%\git\cmd;%B%\git\mingw64\bin;%B%\python;%PATH%"
+REM prepend each bundled Windows tool dir (sysinternals, pwsh, nmap, putty, winscp, iperf3)
+if exist "%B%\wintools" for /d %%D in ("%B%\wintools\*") do set "PATH=%%D;%PATH%"
 set "CHROME_BIN=%CHROME%"
 set "PUPPETEER_EXECUTABLE_PATH=%CHROME%"
 set "CHROME_PATH=%CHROME%"
@@ -31,6 +33,7 @@ echo   PortableAgents (win-x64)
 echo   claude ^| codex ^| git ^| python ^| node
 echo   extras: rg fd bat jq yq uv gh delta micro glow pandoc ffmpeg dust 7z age sops gitleaks rclone syncthing
 echo   apps:   chrome.bat ^| code.bat (VS Code)
+echo   wintools: sysinternals pwsh nmap ncat putty winscp iperf3 (on PATH)
 echo   web app:   start_web.bat
 echo ======================================
 if "%ANTHROPIC_API_KEY%"=="YOUR_KEY_HERE" echo   (no API key set - 'claude' will prompt OAuth login)

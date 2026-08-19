@@ -58,6 +58,27 @@ its `7z.exe`/`7z.dll` are extracted from that installer using the host's own `7z
 time. Extras add ~1.5 GB per full build (pandoc ~190 MB and ffmpeg ~80 MB dominate),
 plus bundled VS Code at ~130 MB/target (~520 MB across all four).
 
+### Windows-only tools (`bin/win-x64/wintools/`, on PATH via the `.bat` launchers)
+
+Windows ships bare, so — only for the `win-x64` target — the build also bundles native
+introspection tooling (Linux/macOS already have rich userlands + trivial installs, so they
+skip this). The `.bat` launchers add each `wintools/<tool>/` dir to PATH automatically.
+
+| Tool | Purpose |
+|---|---|
+| **Sysinternals Suite** | Process Explorer, Procmon, Autoruns, TCPView, Handle, Sigcheck, Strings, PsTools, … |
+| **PowerShell 7** (`pwsh`) | modern shell (not the built-in `powershell.exe`) |
+| **Nmap + Ncat** | port scanning + netcat (extracted from the Nmap installer; raw-packet scans need Npcap on the host) |
+| **PuTTY** (`putty/plink/pscp/psftp`) | SSH/serial client suite |
+| **WinSCP** | portable SCP/SFTP GUI |
+| **iperf3** | network throughput testing |
+
+Note: the bundled **git-for-windows** already puts a unix userland on Windows (`bash`, `grep`,
+`sed`, `awk`, `ssh`, `scp`, `vim`, `less`), and the cross-platform `extras` (`rg fd jq yq curl
+7z gh …`) are on PATH too — so this fills the *Windows-native* gap, not unix basics.
+(Eric Zimmerman's DFIR tools are intentionally not bundled: they need the .NET runtime
+installed on the host, so they aren't self-contained.)
+
 ### Is the web app self-contained? Yes — Node only.
 `.claude/app` (`claude-session-viewer`) is **fully Node.js** — a Vite/React client + a `tsx`/Node
 server (`server/index.ts`). `start_web` uses only the portable Node; **it needs no Python**. Python is
@@ -88,6 +109,7 @@ PortableAgents/
   dist/ bin/ tools/     # build outputs (gitignored): the actual portable payload
                         #   bin/<target>/extras/ = rg fd bat jq yq uv gh delta micro glow pandoc ffmpeg dust 7zz age sops gitleaks rclone syncthing
                         #   bin/<target>/{chrome,vscode}/ = bundled GUI apps (launched via chrome.* / code.*)
+                        #   bin/win-x64/wintools/ = Windows-only tools (sysinternals, pwsh, nmap+ncat, putty, winscp, iperf3)
 ```
 
 The **repo** holds scripts + config templates; the heavy binaries are downloaded into `dist/` at build

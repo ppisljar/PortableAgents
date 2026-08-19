@@ -11,6 +11,8 @@ REM --- PATH + bundled runtimes ------------------------------------------------
 set "CHROME=%B%\chrome\chrome.exe"
 REM shims first: the drive's own launchers must outrank anything npm drops into bin\node
 set "PATH=%ROOT%tools\%T%\shims;%B%\extras;%B%\node;%B%\git\cmd;%B%\git\mingw64\bin;%B%\python;%PATH%"
+REM prepend each bundled Windows tool dir (sysinternals, pwsh, nmap, putty, winscp, iperf3)
+if exist "%B%\wintools" for /d %%D in ("%B%\wintools\*") do set "PATH=%%D;%PATH%"
 set "CHROME_BIN=%CHROME%"
 set "PUPPETEER_EXECUTABLE_PATH=%CHROME%"
 set "CHROME_PATH=%CHROME%"
