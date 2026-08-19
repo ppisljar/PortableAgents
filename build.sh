@@ -319,11 +319,11 @@ if echo " $TARGETS " | grep -q " win-x64 "; then
   U="$(gh_asset PowerShell/PowerShell   latest 'PowerShell-.*-win-x64\.zip$' 2>/dev/null)" && wt_zip pwsh   "$U" || echo "  skip pwsh"
   U="$(gh_asset ar51an/iperf3-win-builds latest 'iperf-.*-win64\.zip$'       2>/dev/null)" && wt_zip iperf3 "$U" || echo "  skip iperf3"
   # WinSCP portable — resolve the latest version, then fetch its portable zip
-  WSV="$(curl -fsSL https://sourceforge.net/projects/winscp/best_release.json 2>/dev/null | python3 -c 'import json,sys,re;d=json.load(sys.stdin);m=re.search(r"WinSCP/([0-9.]+)/",d["release"]["filename"]);print(m.group(1) if m else "")' 2>/dev/null)"
+  WSV="$(curl -fsSL https://sourceforge.net/projects/winscp/best_release.json 2>/dev/null | python3 -c 'import json,sys,re;d=json.load(sys.stdin);m=re.search(r"WinSCP/([0-9.]+)/",d["release"]["filename"]);print(m.group(1) if m else "")' 2>/dev/null)" || true
   [ -n "$WSV" ] && wt_zip winscp "https://winscp.net/download/WinSCP-$WSV-Portable.zip" || echo "  skip winscp (version unresolved)"
   # Nmap + Ncat — distributed only as an NSIS installer now; extract it with the host 7zz
   H7="$OUT/bin/$HOST_T/extras/7zz"
-  NMEXE="$(curl -fsSL https://nmap.org/dist/ 2>/dev/null | grep -oE 'nmap-[0-9.]+-setup\.exe' | sort -V | tail -1)"
+  NMEXE="$(curl -fsSL https://nmap.org/dist/ 2>/dev/null | grep -oE 'nmap-[0-9.]+-setup\.exe' | sort -V | tail -1)" || true
   if [ -d "$WT/nmap" ]; then echo "  nmap: present"
   elif [ -x "$H7" ] && [ -n "$NMEXE" ]; then
     echo "  nmap: $NMEXE (extract via 7zz)"; ni="$STAGE/nmap-setup.exe"
